@@ -343,6 +343,7 @@ void handle0x8XY0(struct DecodedInstruction decodedInstruction){
 			//registersInstance.V[decodedInstruction.X] = registersInstance.V[decodedInstruction.Y];
 
 			registersInstance.V[0xF] = registersInstance.V[decodedInstruction.X] & 0x01;
+			registersInstance.V[decodedInstruction.X] = registersInstance.V[decodedInstruction.X] >> 1; 
 			break;
 		case 0x7:
 			if(registersInstance.V[decodedInstruction.Y] > registersInstance.V[decodedInstruction.X]){
@@ -356,8 +357,10 @@ void handle0x8XY0(struct DecodedInstruction decodedInstruction){
 		case 0xE: 
 			//this is optional, depending on implementation
 			//registersInstance.V[decodedInstruction.X] = registersInstance.V[decodedInstruction.Y];
-			
 			registersInstance.V[0xF] = (registersInstance.V[decodedInstruction.X] & 0x80) >> 7;
+
+			registersInstance.V[decodedInstruction.X] = registersInstance.V[decodedInstruction.X] << 1;
+
 			break;
 	}
 }
@@ -432,7 +435,7 @@ void handleInstruction(){
 				break;
 			case 0x7:
 				//printf("0x7\n");	
-				registersInstance.V[decodedInstruction.X] = registersInstance.V[decodedInstruction.X] + decodedInstruction.NN;
+				registersInstance.V[decodedInstruction.X] += decodedInstruction.NN;
 				break;
 			case 0x8:
 				handle0x8XY0(decodedInstruction);
@@ -440,7 +443,7 @@ void handleInstruction(){
 			case 0x9:
 				if(decodedInstruction.N == 0){
 					if (registersInstance.V[decodedInstruction.X]  != registersInstance.V[decodedInstruction.Y]){
-						registersInstance.PC++;
+						registersInstance.PC+=2;
 					}
 				}
 				break;
@@ -520,9 +523,9 @@ void handleInstruction(){
 						;uint8_t number = registersInstance.V[decodedInstruction.X];
 						uint8_t digit1 = number % 10;
 						memory[registersInstance.I+2] = digit1;
-						uint8_t digit2 = number / 10;
+						uint8_t digit2 = (number / 10) % 10;
 						memory[registersInstance.I + 1] = digit2;
-						uint8_t digit3 = number / 100;
+						uint8_t digit3 = (number / 100) % 10;
 						memory[registersInstance.I] = digit3;
 						break;
 					case 0x55:
@@ -564,7 +567,7 @@ void readRom(){
 	FILE *fp;
 	unsigned char c;
 
-	fp = fopen("roms/BC_test.ch8","rb");
+	fp = fopen("roms/test_opcode.ch8","rb");
 	int counter = 0;
 	while(fread(&c, sizeof(char), 1, fp) > 0){
 		memory[0x200 + counter] = c;
