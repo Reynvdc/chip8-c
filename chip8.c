@@ -7,6 +7,7 @@
 
 #define FREQUENTY_SCREEN (1.0f/60.0f)
 #define FREQUENTY_INSTRUCTIONS (1.0f/700.0f)
+#define FREQUENTY_TIMERS (1.0f/60.0f)
 #define CHARACTER_SET_START_POSITION 0x050
 #define CHIP8_SCREEN_HEIGHT 32
 #define CHIP8_SCREEN_WIDTH 64
@@ -16,6 +17,7 @@ SDL_Window* window = NULL;
 SDL_Renderer* gRenderer = NULL;
 clock_t startTimeScreen;
 clock_t startTimeInstructions;
+clock_t startTimeTimers;
 int quitProgram = 0;
 const uint8_t *keystate;
 
@@ -200,16 +202,16 @@ void drawScreen(){
 	SDL_SetRenderDrawColor( gRenderer, 0xFF, 0xFF, 0xFF, 0xFF );
 	SDL_RenderClear( gRenderer );
 	for(int y=0; y<CHIP8_SCREEN_HEIGHT; y++){
-		printf("\n" );
+		//printf("\n" );
 		for(int x =0; x< CHIP8_SCREEN_WIDTH; x++){
 			char pixel = screenBuffer[x][y];
-			printf("%d " , pixel);
+			//printf("%d " , pixel);
 			drawPixelState(x,y,pixel);
 		}
 	}
 	SDL_RenderPresent( gRenderer );
-	printf("\n" );
-	printf("\n" );
+	//printf("\n" );
+	//printf("\n" );
 
 }
 
@@ -409,18 +411,18 @@ void handleInstruction(){
 				break;
 			case 0x3:
 				if (registersInstance.V[decodedInstruction.X]  == decodedInstruction.NN){
-					registersInstance.PC++;
+					registersInstance.PC+=2;
 				};
 				break;
 			case 0x4:
 				if (registersInstance.V[decodedInstruction.X]  != decodedInstruction.NN){
-					registersInstance.PC++;
+					registersInstance.PC+=2;
 				};
 				break;
 			case 0x5:
 				if(decodedInstruction.N == 0){
 					if (registersInstance.V[decodedInstruction.X]  == registersInstance.V[decodedInstruction.Y]){
-						registersInstance.PC++;
+						registersInstance.PC+=2;
 					}
 				}
 				break;
@@ -476,18 +478,82 @@ void handleInstruction(){
 				;int8_t pressedKey = getKeyboardInput();
 				switch(decodedInstruction.NN){
 					case 0x9E:
-						if(pressedKey == registersInstance.V[X]) {
+						if(pressedKey == registersInstance.V[decodedInstruction.X]) {
 							registersInstance.PC += 2;
 						}
 						break;
 					case 0xA1:
-						if(pressedKey != registersInstance.V[X]) {
+						if(pressedKey != registersInstance.V[decodedInstruction.X]) {
 							registersInstance.PC += 2;
 						}
 						break;
 				}
+				break;
+			case 0xF:
+				switch(decodedInstruction.NN){
+					case 0x07:
+						registersInstance.V[decodedInstruction.X] = registersInstance.DT;
+						break;
+					case 0x15:
+					 	registersInstance.DT = registersInstance.V[decodedInstruction.X];
+						break;
+					case 0x18:
+						registersInstance.ST = registersInstance.V[decodedInstruction.X];
+						break;
+					case 0x1E:
+						registersInstance.I += registersInstance.V[decodedInstruction.X];
+						break;
+					case 0x0A:
+						; int8_t keyPressed = getKeyboardInput();
+						if(keyPressed == -1){
+							registersInstance.PC -= 2;
+						}
+						else{
+							registersInstance.V[decodedInstruction.X] = keyPressed;	
+						}
+						break;
+					case 0x29:
+						;uint8_t characterToFetch = registersInstance.V[decodedInstruction.X];
+						registersInstance.I = characterToFetch + CHARACTER_SET_START_POSITION;
+						break;
+					case 0x33:
+						;uint8_t number = registersInstance.V[decodedInstruction.X];
+						uint8_t digit1 = number % 10;
+						memory[registersInstance.I+2] = digit1;
+						uint8_t digit2 = number / 10;
+						memory[registersInstance.I + 1] = digit2;
+						uint8_t digit3 = number / 100;
+						memory[registersInstance.I] = digit3;
+						break;
+					case 0x55:
+						for(int i = 0; i<= decodedInstruction.X ; i++){
+							memory[registersInstance.I + i] = registersInstance.V[i];
+						}
+						break;
+					case 0x65:
+						for(int i = 0; i<= decodedInstruction.X ; i++){
+							registersInstance.V[i] = memory[registersInstance.I + i];
+						}
+						break;
+				}
+				break;
 		}
 
+
+		deltaTime = 0.0f;
+		startTimeInstructions = clock();
+	}
+}
+
+void handleTimers(){
+	float deltaTime;
+    clock_t timePassed;
+	timePassed = clock() - startTimeInstructions;
+	deltaTime =  (float) timePassed / CLOCKS_PER_SEC;
+	if(deltaTime >= FREQUENTY_TIMERS ){
+
+		if(registersInstance.DT > 0) registersInstance.DT --;
+		if(registersInstance.ST > 0) registersInstance.ST --;
 
 		deltaTime = 0.0f;
 		startTimeInstructions = clock();
@@ -498,7 +564,7 @@ void readRom(){
 	FILE *fp;
 	unsigned char c;
 
-	fp = fopen("roms/IBM-Logo.ch8","rb");
+	fp = fopen("roms/BC_test.ch8","rb");
 	int counter = 0;
 	while(fread(&c, sizeof(char), 1, fp) > 0){
 		memory[0x200 + counter] = c;
@@ -516,10 +582,12 @@ int main(void){
 	readRom();
 	srand(time(NULL));
 	startTimeInstructions = clock();
+	startTimeTimers = clock();
 	while(quitProgram == 0){
 		//handleScreenRefresh();
 		handleKeyInput();
 		handleInstruction();
+		handleTimers();
 	}
 	
 	removeScreenResources();
